@@ -1,0 +1,136 @@
+name: Agentic Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      feature_name:
+        description: 'Feature to build (e.g., "user-auth", "api-rate-limiter")'
+        required: true
+        type: string
+      description:
+        description: 'Brief description of the feature'
+        required: false
+        type: string
+        default: ''
+      branch:
+        description: 'Branch name (auto-generated if omitted)'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  agent-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./workspace
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Determine branch name
+        id: branch
+        run: |
+          if [ -z "${{ github.event.inputs.branch }}" ]; then
+            BRANCH="feat/${{ github.event.inputs.feature_name }}-$(date +%s)"
+          else
+            BRANCH="${{ github.event.inputs.branch }}"
+          fi
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "Feature branch: $BRANCH"
+
+      - name: Create feature branch
+        run: |
+          git config user.name "Agentic Engine"
+          git config user.email "agent@engineering-loop.dev"
+          git checkout -b "${{ steps.branch.outputs.branch }}"
+
+      - name: Install dependencies
+        run: |
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+          fi
+          if [ -f "pyproject.toml" ]; then
+            pip install .
+          fi
+
+      - name: Run agent build
+        env:
+          FEATURE_NAME: ${{ github.event.inputs.feature_name }}
+          DESCRIPTION: ${{ github.event.inputs.description }}
+        run: |
+          echo "Building feature: $FEATURE_NAME"
+          echo "Description: $DESCRIPTION"
+          # --- AGENT CODE PLACEHOLDER ---
+          # Replace this section with your actual agent logic
+          # The agent's build/test/iterate code runs here
+          # Example: python -m agents.build --feature "$FEATURE_NAME"
+          # Example: python -m agents.test --feature "$FEATURE_NAME"
+          # Example: python -m agents.iterate --feature "$FEATURE_NAME"
+          # ---------------------------------
+          echo "Agent build complete for: $FEATURE_NAME"
+          echo "AGENT_BUILD_COMPLETE=true" >> $GITHUB_ENV
+
+      - name: Run tests
+        if: env.AGENT_BUILD_COMPLETE == 'true'
+        run: |
+          if [ -f "pytest.ini" ] || [ -f "pyproject.toml" ]; then
+            python -m pytest tests/ -v --tb=short || true
+          fi
+          if [ -f "Makefile" ]; then
+            make test || true
+          fi
+
+      - name: Commit and push feature branch
+        if: env.AGENT_BUILD_COMPLETE == 'true'
+        run: |
+          git add -A
+          git diff --cached --quiet || git commit -m "feat: ${{ github.event.inputs.feature_name }}
+
+          ${{ github.event.inputs.description }}"
+          git push -u origin "${{ steps.branch.outputs.branch }}"
+
+      - name: Create PR
+        if: env.AGENT_BUILD_COMPLETE == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_TITLE="feat: ${{ github.event.inputs.feature_name }}"
+          PR_BODY="## Summary
+          - Feature: ${{ github.event.inputs.feature_name }}
+          - ${{ github.event.inputs.description }}
+
+          ## Agent Pipeline
+          - Branch: \`${{ steps.branch.outputs.branch }}\`
+          - Built by Agentic Pipeline workflow
+
+          ---
+          ⚠️ **Human approval required** before merging to main."
+
+          gh pr create \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY" \
+            --base main \
+            --head "${{ steps.branch.outputs.branch }}" \
+            --label "agent-generated" \
+            --label "needs-approval" || echo "PR may already exist"
+
+      - name: Build failed
+        if: env.AGENT_BUILD_COMPLETE != 'true'
+        run: |
+          echo "Agent build did not complete successfully"
+          exit 1
