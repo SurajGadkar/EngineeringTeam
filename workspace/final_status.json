@@ -1,0 +1,16 @@
+{
+  "iterations": 1,
+  "max": 5,
+  "final_status": "production-ready",
+  "history": [
+    {
+      "iteration": 1,
+      "dev_path": "/home/ubuntu/engineering-team/workspace/app",
+      "test_path": "/home/ubuntu/engineering-team/workspace/app/tests/test_results.json",
+      "qa_path": "/home/ubuntu/engineering-team/workspace/app/qa_report.json",
+      "signoff": true,
+      "production_ready": true,
+      "feedback_next": ""
+    }
+  ]
+}
