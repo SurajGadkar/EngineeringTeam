@@ -1,0 +1,16 @@
+import React,{useState,useEffect} from 'react';
+export default function App(){
+  const[tasks,setTasks]=useState([]),[title,setTitle]=useState(''),[search,setSearch]=useState(''),[pri,setPri]=useState('Medium'),[loading,setLoading]=useState(true);
+  const api='/api/tasks';
+  const fetchTasks=()=>fetch(`${api}?search=${search}&status=${filterStatus}`).then(r=>r.json()).then(d=>{setTasks(d);setLoading(false);}).catch(()=>setLoading(false));
+  const[filterStatus,setFilterStatus]=useState('');
+  useEffect(()=>{fetchTasks()},[]);
+  const add=()=>{if(!title.trim())return;fetch(api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,status:'To Do',priority:pri})}).then(()=>{setTitle('');fetchTasks();})};
+  const move=(id)=>{const next={To Do:'In Progress','In Progress':'Done',Done:'To Do'};fetch(`${api}/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:next[tasks.find(t=>t._id===id)?.status]})}).then(()=>fetchTasks())};
+  const del=(id)=>fetch(`${api}/${id}`,{method:'DELETE'}).then(()=>fetchTasks());
+  const cols=[{label:'To Do',key:'To Do'},{label:'In Progress',key:'In Progress'},{label:'Done',key:'Done'}];
+  const cols2=[{label:'All',key:''},{label:'To Do',key:'To Do'},{label:'In Progress',key:'In Progress'},{label:'Done',key:'Done'}];
+  const priColor=p=>(p==='High'?'#fca5a5':p==='Medium'?'#fcd34d':'#86efac');
+  if(loading)return<div style={{padding:40}}>Loading Kanban...</div>;
+  return(<div style={{fontFamily:'system-ui',maxWidth:1200,margin:'0 auto',padding:20}}><h1>Kanban Board (Trello Lite)</h1><div style={{display:'flex',gap:10,marginBottom:10}}><input value={title} onChange={e=>setTitle(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} placeholder="New task..." style={{flex:1,padding:10}}/><select value={pri} onChange={e=>setPri(e.target.value)}><option>Low</option><option>Medium</option><option>High</option></select><button onClick={add}>Add</button></div><div style={{display:'flex',gap:10,marginBottom:16}}><input value={search} onChange={e=>{setSearch(e.target.value);fetchTasks()}} placeholder="Search tasks..." style={{flex:1,padding:8}}/>{cols2.map(c=><button key={c.key} onClick={()=>{setFilterStatus(c.key);fetchTasks()}} style={{background:filterStatus===c.key?'#3b82f6':'#e5e7eb',color:filterStatus===c.key?'#fff':'#000',fontWeight:filterStatus===c.key?'bold':'normal'}}>{c.label}</button>)}</div><div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>{cols.map(c=>(<div key={c.key} style={{background:'#f0f0f0',padding:12,borderRadius:8}}><h3>{c.label}</h3><div style={{minHeight:120}}>{tasks.filter(t=>t.status===c.key).map(t=>(<div key={t._id} style={{background:'#fff',padding:10,marginBottom:8,borderRadius:6,boxShadow:'0 1px 3px rgba(0,0,0,.1)',borderLeft:`4px solid ${priColor(t.priority)}`}}><strong>{t.title}</strong><span style={{float:'right',fontSize:11,background:priColor(t.priority),padding:'2px 6px',borderRadius:4}}>{t.priority}</span><div style={{marginTop:6,fontSize:12,color:'#666'}}>{t.status}</div><div style={{marginTop:8,display:'flex',gap:6}}><button onClick={()=>move(t._id)}>Move</button><button onClick={()=>del(t._id)} style={{color:'#c00'}}>Delete</button></div></div>))}</div></div>))}</div></div>);
+}
