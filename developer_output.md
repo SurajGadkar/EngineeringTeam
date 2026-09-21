@@ -1,0 +1,1 @@
+# Developer generated structured MERN app (see workspace/app)
